@@ -4,6 +4,14 @@ Statement stmt = connection.createStatement();
 ResultSet rs = stmt.executeQuery(query);
 //End of example
 
+//Mitigating SQL Injection vulnerability
+PreparedStatement stmt = connection.prepareStatement("SELECT * FROM users WHERE userid=? AND password=?");
+
+stmt.setString(1, userid);
+stmt.setString(2, password);
+
+ResultSet rs = stmt.executeQuery();
+
 //Example case 2
 public void postToMessageBoard(MessageBoard mb){
 	BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
