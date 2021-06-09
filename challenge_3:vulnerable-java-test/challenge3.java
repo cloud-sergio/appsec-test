@@ -21,7 +21,7 @@ public void postToMessageBoard(MessageBoard mb){
 }
 //End of Example
 
-// User Input Sanitization:
+// Added Try Catch to minimize risk of errors from user input
 	try{
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		String s = br.readLine(); //VIOLATION, 
