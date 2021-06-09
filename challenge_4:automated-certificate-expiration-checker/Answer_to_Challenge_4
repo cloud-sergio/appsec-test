@@ -1,0 +1,248 @@
+1. Identify which public subnets belong to Overstock.com, 
+              Public Subnet Range: 173.241.144.0 - 173.241.159.255
+nslookup
+
+> server 8.8.8.8
+Default Server:  dns.google
+Address:  8.8.8.8
+
+> overstock.com
+Server:  dns.google
+Address:  8.8.8.8
+
+Non-authoritative answer:
+Name:    overstock.com
+Address:  173.241.154.15
+
+Using this IP I was able to gain more information with whois:
+IP Location	United States United States Salt Lake City Overstock.com
+ASN	United States AS25655 OSTK-COM, US (registered Apr 15, 2002)
+Resolve Host	overstock.ca
+Whois Server	whois.arin.net
+IP Address	173.241.154.15
+Reverse IP	5 websites use this address.
+NetRange:       173.241.144.0 - 173.241.159.255
+CIDR:           173.241.144.0/20
+NetName:        OVERSTOCK
+NetHandle:      NET-173-241-144-0-1
+Parent:         NET173 (NET-173-0-0-0-0)
+NetType:        Direct Assignment
+OriginAS:       AS25655
+Organization:   Overstock.com (OVERST)
+RegDate:        2010-04-26
+Updated:        2012-03-02
+Ref:            https://rdap.arin.net/registry/ip/173.241.144.0
+
+OrgName:        Overstock.com
+OrgId:          OVERST
+Address:        6350 South 3000 East
+City:           Salt Lake City
+StateProv:      UT
+PostalCode:     84121-6931
+Country:        US
+RegDate:        2000-01-04
+Updated:        2014-10-28
+Ref:            https://rdap.arin.net/registry/entity/OVERST
+
+
+# I was not able to find more information from reseach it seems there is no simple way to find all public IP ranges for a company. I found the IP range using whois, but this does not mean that this is all public subnets.
+
+
+
+2. Build a tool that can scan those subnets to identify hosts listening on port 443 using docker
+    One could use NMap to determine which hosts are listening on Port 443.
+    
+
+3. Once those servers are identified, extract the HTTPS certificate and parse the validity information to see when it will expire.
+    Check the expiration date of an SSL certificate:
+      Open a UNIX command line window.
+      Perform a query such as, openssl s_client -servername <NAME> -connect <HOST:PORT> 2>/dev/null | openssl x509 -noout -dates . The expiration date appears in the response as notAfter=<expiration_date>
+
+4. Generate output that can be used to determine which certificates are (1) already expired or (2) will expire within the next year. This can be an email or a report, but it should be understandable and efficiently denote which certificates should be prioritized for update.
+      After running the UNIX command from question 3, we can generate a report or email by listing the information and organizing certificates based on expiry date from soonest to latest.
+      
+
+
+Docker Project:
+
+Automating Certificates with Certbot in Docker
+ 
+0
+ dawilk written 1 year ago
+Generating and maintaining certificates can be a chore. With a little help from Let’s Encrypt, docker, and cron, we’ll turn that chore into a “set it and forget it” machine.
+
+In the previous guides, we set up a WordPress website and configured a reverse proxy to handle TLS with a self-signed certificate.
+In this guide, we’ll create a trusted certificate for our website, and set up an auto-renewal schedule. And we’ll do it for for the bargain price of free!
+
+The Short Answer
+These quick steps to fully automate certificate renewal using Route 53 as a DNS provider. This assumes the destination web server is nginx, but step 3 can be adjusted to work with any web server.
+
+Generate a certificate with certbot.
+Example: docker run --rm -it --env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE --env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY -v "/etc/letsencrypt:/etc/letsencrypt" certbot/dns-route53 certonly --dns-route53 -d coderevolve-site.com --agree-tos
+Schedule the renewal command to run daily with cron (or any other scheduler).
+Example (cron): 0 0 * * * /root/renew_certs.sh
+renew_certs.sh contents:
+docker run --rm -it --env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE --env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY -v "/etc/letsencrypt:/etc/letsencrypt" certbot/dns-route53 renew --dns-route53 --agree-tos
+Update nginx with certificate changes.
+Example (cron): 5 0 * * * [check for changes] && [copy changes] && [reload nginx]
+(This one is a bit long – see the script in Step 3 below for a template.)
+That’s it! We now have fully automatic certificate management for our website.
+
+For a more in-depth understanding of each of these steps, read on!
+
+The Long Answer
+Before continuing, Docker should be installed already. Links to installations for all operating systems can be found on the sidebar.
+
+This guide utilizes AWS Route 53 for DNS, and IAM Access Keys to manage Route 53. If you don’t use Route 53 for your DNS and/or haven’t set up IAM keys, you will not be able to reproduce the steps below. If your DNS provider is not AWS but is supported by cerbot, you can substitute the AWS-related items below with configurations relevant to your provider.
+
+Step 1: Generate a new certificate with certbot
+Before we can get a trusted certificate from Let’s Encrypt, we need to understand our “challenge” options. There are two primary methods certbot uses to verify our identity (the “challenge”) before generating a certificate for us:
+
+HTTP-01 | This challenge looks for a custom file on our public-facing website. If that file exists, a certificate is created for us.
+DNS-01 | This challenge looks for a custom TXT record on our public DNS. If the TXT record is there, a certificate is created for us.
+When a website isn’t visible to the public (as is the case for this guide), our only option is DNS-01. So to automate the certificate process, we need a way to a) request a certificate, b) receive the challenge, c) create the DNS record, d) resolve the challenge, and e) save the resulting certificate files. With a bit of configuration, all of these steps can be handled automatically by certbot.
+
+There are many DNS providers out there which means there are many unique options for certbot to handle the DNS steps. In our example below, we’ll use Route 53 (AWS) as our DNS provider. To do this automation with another provider, take a look at the DNS plugins section of the certbot documentation, and modify the command below accordingly.
+
+certbot certonly (in Docker)
+docker run --rm -it \
+--name certbot \
+--env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
+--env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+-v "/etc/letsencrypt:/etc/letsencrypt" \
+-v "/var/lib/letsencrypt:/var/lib/letsencrypt" \
+certbot/dns-route53 certonly \
+--dns-route53 \
+-d coderevolve-site.com \
+--agree-tos
+This is a long command. Let’s break it apart. Optional commands are italic and can be removed, but have their uses.
+
+docker run –rm -it | run a docker container, remove it when finished, and show the console output while it runs
+–name cerbot | name the running container. This is useful because it prevents the same command from being run more than once at a time. It also makes it easier to monitor or find this container when it is running.
+–env AWS_ACCESS_KEY_ID=[…] | the identity with access to manage Route 53 for our domain
+–env AWS_SECRET_ACCESS_KEY=[…] | the secret/password for our AWS_ACCESS_KEY_ID
+-v “/etc/letsencrypt:/etc/letsencrypt” | docker volume to keep certificates after creation
+-v “/var/lib/letsencrypt:/var/lib/letsencrypt” | docker volume where config backups go. This is useful if we have certbot change web server configs, but we don’t in this example.
+certbot/dns-route53 | the docker image and tag to use. This image tag has the dns-route53 plugin installed, which we need in order to handle the challenge.
+certonly | the first actual parameter for the certbot command. This tells certbot to only get the certificate (no touching web servers).*
+–dns-route53 | this tells certbot to use the Route 53 plugin for the DNS challenge
+-d coderevolve-site.com | this is the domain for which we’re requesting a certificate. This domain must be managed by our DNS provider (Route 53 in this example).
+–agree-tos | agree to the ACME Subscriber Agreement. This is required for automating requests.
+*Because we’re running certbot in a container, we lose access to some of the built-in options for updating web server configs and restarting services. So certonly is about the only option we have. This won’t be a problem for us, though, because we already know exactly what we need to do after we get our certificate.
+
+The approach taken here can also be better for security and scalability. We can make the initial request and future renewals from a central, hardened system. Then, once we have the certificates, we can deploy them however makes the most sense for our web services. In this example, that means we avoid giving our edge/web servers direct access to credentials that manage our DNS! (Danger, Will Robinson! Danger!)
+
+After running the command, we should see something like the following:
+
+Found credentials in environment variables.
+Plugins selected: Authenticator dns-route53, Installer None
+Enter email address (used for urgent renewal and security notices) (Enter 'c' to
+cancel): certadmin@coderevolve-site.com
+ 
+Would you be willing to share your email address with the Electronic Frontier
+Foundation, a founding partner of the Let's Encrypt project and the non-profit
+organization that develops Certbot? We'd like to send you email about our work
+encrypting the web, EFF news, campaigns, and ways to support digital freedom.
+ 
+(Y)es/(N)o: n
+Obtaining a new certificate
+Performing the following challenges:
+dns-01 challenge for coderevolve-site.com
+Waiting for verification…
+Cleaning up challenges
+Step 2: Schedule the renewal
+Certificates from Let’s Encrypt are short-lived (90 days). This means renewals will need to happen pretty regularly to keep current.
+
+The certbot renew command handles this task for us. It checks all the certificates that it has previously created, and only attempts to renew the ones that are expiring within 30 days.
+
+We will set a renew job to run every day. The command we use is almost identical to the command for creating the certificate, with a couple minor changes:
+
+Change certonly to renew
+Remove the -d coderevolve-site.com parameter
+certbot renew (in Docker)
+docker run --rm -it \
+--name certbot \
+--env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
+--env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+-v "/etc/letsencrypt:/etc/letsencrypt" \
+-v "/var/lib/letsencrypt:/var/lib/letsencrypt" \
+certbot/dns-route53 renew \
+--dns-route53 \
+--agree-tos
+Now we just need to put this in crontab. We’re going to put it in the root user crontab.
+
+Run sudo crontab -e and add the following line (this is a single line) to the file:
+
+0 0 * * * docker run --rm -it --name certbot --env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE --env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY -v "/etc/letsencrypt:/etc/letsencrypt" -v "/var/lib/letsencrypt:/var/lib/letsencrypt" certbot/dns-route53 renew --dns-route53 --agree-tos
+Alternatively, since this command includes credentials with programmatic access to AWS, it’d be a good idea to move this command into a shell script (e.g. /root/renew_certs.sh) instead of putting the full command directly into crontab.
+
+After putting the command in a shell script, you can use this line in crontab instead:
+0 0 * * * /root/renew_certs.sh
+
+Step 3: Update nginx with certificate changes
+Before we continue, let’s pause to highlight a few things about our environment at this point.
+
+Certbot is placing the new certificates under /etc/letsencrypt
+The ssl directory for nginx is somewhere completely different
+We need to copy the new certificate files from the letsencrypt folder to the ssl folder
+We need to reload nginx any time the certificate files are updated in the ssl folder
+If we weren’t using cerbot in docker, we would want to handle #3 and #4 using the --deploy-hook parameter with the certbot renew command.
+An unfortunate side effect of using the certbot container is that we can’t easily manipulate the files in the nginx container and send reload commands to nginx in the other container. So to keep things simple, we’ll just bundle both the renewals and the reloads in a single cron task.
+
+In this task, we’ll handle #3 and #4 by using a short and simple shell script that checks to see if the letsencrypt certificate is newer than the one in the [...]/nginx/ssl folder. If letsencrypt is newer, copy over both files and reload nginx.
+We’re also going to go ahead and put the renew command at the top so we can have it all in one task.
+
+/root/renew_certs.sh
+# /bin/sh
+
+docker run --rm -it \
+    --name certbot \
+    --env AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
+    --env AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+    -v "/etc/letsencrypt:/etc/letsencrypt" \
+    -v "/var/lib/letsencrypt:/var/lib/letsencrypt" \
+    certbot/dns-route53 renew \
+    --dns-route53 --agree-tos 
+
+certbot_cert=/etc/letsencrypt/live/coderevolve-site.com/cert.pem
+certbot_key=/etc/letsencrypt/live/coderevolve-site.com/privkey.pem
+
+nginx_cert=/path/to/nginx/ssl/certificate.pem
+nginx_key=/path/to/nginx/ssl/key.pem
+
+if [ "$certbot_cert" -nt "$nginx_cert" ]
+then
+    echo "Updating certificate..."
+    cp $certbot_cert $nginx_cert
+    cp $certbot_key $nginx_key
+    echo "Reloading nginx..."
+    docker exec reverseproxy nginx -s reload
+    echo "Done!"
+else
+    echo "Certificate is already up-to-date."
+fi
+We’ll put this script at /root/renew_certs.sh
+Then, we put the following task in crontab:
+0 0 * * * /root/renew_certs.sh
+
+That’s all there is to it!
+
+Alternative Configurations
+IIS Web Server
+While the main guide is designed with a linux web server in mind (and a linux host managing the certificates), it is entirely possible to set this up to run in Docker for Windows. The rough steps to accomplish this look like this:
+
+Generate and renew certificates using the certbot container with a volume mapped to a Windows path
+e.g. replace the -v parameter with something like -v c:/certs:/etc/letsencrypt
+Create a pfx from the cert.pem and privkey.pem files. We can do this with openssl.
+e.g. something like openssl pkcs12 -export -out c:/certs/mycert.pfx -inkey c:/certs/live/coderevolve-site.com/privkey.pem -in c:/certs/live/coderevolve-site.com/fullchain.pem
+Import the certificate into the Local Machine store.
+e.g. Import-PfxCertificate -FilePath c:/certs/mycert.pfx -CertStoreLocation Cert:/LocalMachine/My
+Change the IIS site bindings to use the new certificate with PowerShell.
+This is a little more complicated because we need to get the thumbprint from the certificate store and add it to the site binding. In the example below, we use a crude filter to get the newest imported certificate for the domain, and apply it to the https site.
+e.g. $CertThumbprint = (Get-ChildItem -Path Cert:/LocalMachine/My | Where-Object { $_.Subject -like '*coderevolve-site.com*' } | Sort-Object NotBefore -Descending)[0].Thumbprint
+(Get-WebBinding -Name coderevolve-site.com -Protocol https).AddSslCertificate($CertThumbprint, 'My')
+The steps above could be placed in a PowerShell script that runs daily using Task Scheduler, renewing the certificates and updating IIS bindings.
+
+
+I found this Docker project which outlines what would be required to automate identification of expired and soon-to-be expired HTTPS certificates associated with Overstock.com.
+      
