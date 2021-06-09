@@ -149,7 +149,7 @@ Updated:        2014-10-28
 Ref:            https://rdap.arin.net/registry/entity/OVERST
 
 
-# I was not able to find more information from research it seems there is no simple way to find all public IP ranges for a company. I found the IP range using whois, but this does not mean that this is all public subnets.
+I was not able to find more information from research it seems there is no simple way to find all public IP ranges for a company. I found the IP range using whois, but this does not mean that this is all public subnets.
 
 
 
@@ -174,5 +174,4 @@ Docker Project:
 The following docker project seems to have outlined the requirements for this challenge. This project has been updated recently and does the following:
 Certificate Expiry Monitor Controller monitors the expiration of TLS certificates used in Ingress. 
 
-# Before running this on my network I would read through all the code and verify that I know what it is doing and I would put in a change log for change management.
 docker pull mercari/certificate-expiry-monitor-controller
