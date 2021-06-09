@@ -71,4 +71,4 @@ The following docker project seems to have outlined the requirements for this ch
 Certificate Expiry Monitor Controller monitors the expiration of TLS certificates used in Ingress. 
 
 # Before running this on my network I would read through all the code and verify that I know what it is doing and I would put in a change log for change management.
-docker pull mercari/certificate-expiry-monitor-controller
+https://github.com/mercari/certificate-expiry-monitor-controller
