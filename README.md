@@ -51,3 +51,48 @@ Upgrade com.fasterxml.jackson.core:jackson-databind@2.7.9.4 to com.fasterxml.jac
 Upgrade org.springframework.boot:spring-boot-starter-web@1.1.1.RELEASE to org.springframework.boot:spring-boot-starter-web@2.3.0.RELEASE to fix
 However 2.3.0 still leaves High Severity Vulnerabilities to fix these remaining vulnerabilities there is information close to the end of the test result file, which states that version
 spring-web@4.0.5.RELEASE will fix these issues.
+
+
+
+
+Challenge 3: Vulnerable Java Test
+
+Example 1:
+// Mitigating SQL Injection vulnerability:
+
+String sql_query = "SELECT * FROM users WHERE userid =? AND password=?";
+PreparedStatement prepStmt = conn.prepareStatement(sql_query);
+prepStmt.setString(1, username); 
+prepStmt.setString(2, Base64.getEncoder().encodeToString(passwordString.getBytes()));
+prepStmt.executeUpdate();
+prepStmt.close();
+
+
+Example 2:
+// Added Try Catch to minimize risk from user input
+	try{
+		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+		String s = br.readLine(); //VIOLATION, 
+		mb.post(s)
+	}
+	catch(Exception e){
+			
+	}
+  
+  
+  Example 3:
+  // URL Validation
+String url = request.getParameter("hidden_url"); // not so hidden...
+URL url = new URL(url); // VIOLATION 
+InputStream is = url.openConnection().getContent();
+//Build an url validator 
+//Class UrlValidator Default schemes: {https,http,ftp} 
+UrlValidator urlValidator = new UrlValidator();
+//perform zero trust
+if (urlValidator.isValid(url) {
+      URL url = new URL(url); 
+      InputStream is = url.openConnection().getContent();
+//	System.out.println("URL is valid");
+    } else {
+      	System.out.println("URL is not valid");
+    }
