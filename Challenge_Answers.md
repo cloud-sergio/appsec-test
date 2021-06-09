@@ -75,9 +75,7 @@ Example 2:
 		String s = br.readLine(); //VIOLATION, 
 		mb.post(s)
 	}
-	catch(Exception e){
-			
-	}
+	catch(Exception e){}
   
   
   Example 3:
