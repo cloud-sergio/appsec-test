@@ -36,3 +36,19 @@ String url = request.getParameter("hidden_url"); // not so hidden...
 URL url = new URL(url); // VIOLATION 
 InputStream is = url.openConnection().getContent();
 //End of Example
+
+// URL Validation
+String url = request.getParameter("hidden_url"); // not so hidden...
+URL url = new URL(url); // VIOLATION 
+InputStream is = url.openConnection().getContent();
+//Build an url validator 
+//Class UrlValidator Default schemes: {https,http,ftp} 
+UrlValidator urlValidator = new UrlValidator();
+//perform zero trust
+if (urlValidator.isValid(url) {
+      URL url = new URL(url); 
+      InputStream is = url.openConnection().getContent();
+//	System.out.println("URL is valid");
+    } else {
+      	System.out.println("URL is not valid");
+    }
