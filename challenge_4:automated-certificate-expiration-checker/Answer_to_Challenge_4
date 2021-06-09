@@ -244,5 +244,116 @@ e.g. $CertThumbprint = (Get-ChildItem -Path Cert:/LocalMachine/My | Where-Object
 The steps above could be placed in a PowerShell script that runs daily using Task Scheduler, renewing the certificates and updating IIS bindings.
 
 
-I found this Docker project which outlines what would be required to automate identification of expired and soon-to-be expired HTTPS certificates associated with Overstock.com.
+#### I found this Docker project which outlines what would be required to automate identification of expired and soon-to-be expired HTTPS certificates associated with Overstock.com.
       
+
+
+
+#### I also found this Docker project which should have similar results:
+
+
+Automating the management of HTTPS certificates in a Dockerized environment with Let’s Encrypt
+Hi, my name is Pablo, and I am a friend of Jesús Amieiro and partner at TramitApp, an online Human Resources software that helps you better manage your employees (holidays, sickness leaves, expense reports, etc.)
+
+We’ve been friends for a while, and every now and then we meetup to talk about “geeky stuff”.
+
+In one of those meetings, he talked to me about Let’s Encrypt and how easy it was to set it up in a WordPress environment, so I followed his advice and set it up for free in the WordPress installations I currently manage.
+
+
+Once our HTTPS certificate was going to expire pretty soon(a COMODO wildcard we have purchased a year ago), I thought… maybe we could use Let’s Encrypt here as well, not only to save 120€ for the certificate but also automate this process and forget about having to renew it every year manually.
+
+Our system architecture is deployed with docker, where we have an HTTP server (nginx), a database, and a backend server.
+
+I tried to find a solution that would have minimal impact in what we already had deployed so I searched for a solution that its only task would be to generate the certificates and would be accessible by our HTTP server.
+
+The solution I found the most well suited for this was Pierre Prinetti’s, available from the following link https://github.com/pierreprinetti/certbot
+
+Basically, we create a docker volume where the certificates will be saved when the container is run. So, if we generate the certificates in a volume shared by this container and the nginx container, we don’t need to change anything on other containers, just modify the nginx config file and add this volume to the docker-compose file.
+
+Steps:
+
+1.- We create a volume named “certs”
+
+docker volume create --name certs
+2.- We stop for a moment the http container so we can generate the certificates.
+
+docker stop http-server
+3.- We run the container with the certificate or certificates we want to generate.
+
+docker run \
+-v certs:/etc/letsencrypt \
+-e http_proxy=$http_proxy \
+-e domains="my.domain.com" \
+-e email="firstName.lastName@domain.com" \
+-p 80:80 \
+-p 443:443 \
+--rm pierreprinetti/certbot:latest
+4.- We start again our http server
+
+docker start http-server
+We can check the certificates by inspecting the “certs” volume.
+
+docker volume inspect certs
+Once they’re generated, we only need to mount the volume of the certificates we already generated in our http container, in our case we orchestrate the containers with docker-compose and change the server configuration to use the new certs.
+
+In our case, the nginx config file would change like this,
+
+listen 443 http2;
+listen [::]:443 http2;
+server_name example.com;
+
+ssl on;
+ssl_certificate /etc/nginx/certs/live/example.com/fullchain.pem;
+ssl_certificate_key /etc/nginx/certs/live/example.com/privkey.pem;
+After this, we only need to run docker-compose again to reflect the changes made in the http server.
+
+docker-compose up -d
+The last step after checking everything is working just fine is to automate the renewal process.
+
+Pierre had a script to renew the certs and even thought it has taken it down from GitHub, here’s the source code:
+
+#!/usr/bin/env bash
+
+while getopts ":s:" opt; do
+case $opt in
+s)
+webserver_container=$OPTARG
+;;
+\?)
+echo "Invalid option: -$OPTARG" >&2
+exit 1
+;;
+:)
+echo "Option -$OPTARG requires an argument." >&2
+exit 1
+;;
+esac
+done
+
+docker pull pierreprinetti/certbot:latest
+
+if [ -z ${webserver_container+x} ]; then :; else
+webserver_is_running=$(docker inspect -f {{.State.Running}} $webserver_container)
+if $webserver_is_running; then docker stop $webserver_container; fi
+fi
+
+docker run \
+-v nginx-certs:/etc/letsencrypt \
+-e http_proxy=$http_proxy \
+-e renew=true \
+-p 80:80 \
+-p 443:443 \
+--rm pierreprinetti/certbot:latest
+
+if [ -z ${webserver_container+x} ]; then :; else
+if $webserver_is_running; then docker start $webserver_container; fi
+fi
+For running this script we only need to pass the name of the http container as an argument so that the script stops and re-starts again the container when needed. Like this:
+
+./certbot-renew -s http-server
+We just need to schedule a cron job to execute this script.
+
+crontab -e
+We add the following line to run this script 2 times a day, just like Jesús told us in his post, and we are done.
+
+15 2,14 * * * /home/user/letsencrypt/certbot-renew.sh -s nginx > /home/user/certbot-renew.log
