@@ -34,3 +34,20 @@ Resolution of vulnerability:
 1. I don't see in the Dockerfile or in any of the files where binutils is being used.
 2. Based on the fact that GNU Binutils 2.30 is the version that is mentioned by NIST. Remediation would likely be to update binutils, since I don't see it in our code, to remediate I believe the correct solution is to update the version of alpine that we are currently using.
 3. The latest release of alpine is 3.13.5.
+
+
+Challenge 2: Maven Dependency Resolution Test
+
+The test results is reporting the following:
+
+Testing /mnt/c/Users/siwilkins/Scripting/Projects/appsec_test/challenge_2:maven-dependency-test...
+Tested 31 dependencies for known issues, found 98 issues, 98 vulnerable paths.
+
+Issues to fix by upgrading:
+Upgrade com.fasterxml.jackson.core:jackson-databind@2.7.9.4 to com.fasterxml.jackson.core:jackson-databind@2.9.10.8 to fix
+
+&
+
+Upgrade org.springframework.boot:spring-boot-starter-web@1.1.1.RELEASE to org.springframework.boot:spring-boot-starter-web@2.3.0.RELEASE to fix
+However 2.3.0 still leaves High Severity Vulnerabilities to fix these remaining vulnerabilities there is information close to the end of the test result file, which states that version
+spring-web@4.0.5.RELEASE will fix these issues.
