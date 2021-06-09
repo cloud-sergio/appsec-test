@@ -69,7 +69,7 @@ prepStmt.close();
 
 
 Example 2:
-// Added Try Catch to minimize risk from user input
+// Added Try Catch to minimize risk of errors from user input
 	try{
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		String s = br.readLine(); //VIOLATION, 
@@ -96,3 +96,83 @@ if (urlValidator.isValid(url) {
     } else {
       	System.out.println("URL is not valid");
     }
+
+
+
+
+Challenge 4: Automated Certificate Expiration Checker
+
+1. Identify which public subnets belong to Overstock.com, 
+              Public Subnet Range: 173.241.144.0 - 173.241.159.255
+nslookup
+
+> server 8.8.8.8
+Default Server:  dns.google
+Address:  8.8.8.8
+
+> overstock.com
+Server:  dns.google
+Address:  8.8.8.8
+
+Non-authoritative answer:
+Name:    overstock.com
+Address:  173.241.154.15
+
+Using this IP I was able to gain more information with whois:
+IP Location	United States United States Salt Lake City Overstock.com
+ASN	United States AS25655 OSTK-COM, US (registered Apr 15, 2002)
+Resolve Host	overstock.ca
+Whois Server	whois.arin.net
+IP Address	173.241.154.15
+Reverse IP	5 websites use this address.
+NetRange:       173.241.144.0 - 173.241.159.255
+CIDR:           173.241.144.0/20
+NetName:        OVERSTOCK
+NetHandle:      NET-173-241-144-0-1
+Parent:         NET173 (NET-173-0-0-0-0)
+NetType:        Direct Assignment
+OriginAS:       AS25655
+Organization:   Overstock.com (OVERST)
+RegDate:        2010-04-26
+Updated:        2012-03-02
+Ref:            https://rdap.arin.net/registry/ip/173.241.144.0
+
+OrgName:        Overstock.com
+OrgId:          OVERST
+Address:        6350 South 3000 East
+City:           Salt Lake City
+StateProv:      UT
+PostalCode:     84121-6931
+Country:        US
+RegDate:        2000-01-04
+Updated:        2014-10-28
+Ref:            https://rdap.arin.net/registry/entity/OVERST
+
+
+# I was not able to find more information from research it seems there is no simple way to find all public IP ranges for a company. I found the IP range using whois, but this does not mean that this is all public subnets.
+
+
+
+2. Build a tool that can scan those subnets to identify hosts listening on port 443 using docker
+    One could use NMap to determine which hosts are listening on Port 443.
+    The syntax for this command would be:
+      nmap -sT -p 443 overstock.com
+    
+
+3. Once those servers are identified, extract the HTTPS certificate and parse the validity information to see when it will expire.
+    Check the expiration date of an SSL certificate:
+      Open a UNIX command line window.
+      Perform a query such as, openssl s_client -servername <NAME> -connect <HOST:PORT> 2>/dev/null | openssl x509 -noout -dates . The expiration date appears in the response as notAfter=<expiration_date>
+
+4. Generate output that can be used to determine which certificates are (1) already expired or (2) will expire within the next year. This can be an email or a report, but it should be understandable and efficiently denote which certificates should be prioritized for update.
+      After running the UNIX command from question 3, we can generate a report or email by listing the information and organizing certificates based on expiry date from soonest to latest.
+      
+
+
+Docker Project:
+
+The following docker project seems to have outlined the requirements for this challenge. This project has been updated recently and does the following:
+Certificate Expiry Monitor Controller monitors the expiration of TLS certificates used in Ingress. 
+
+# Before running this on my network I would read through all the code and verify that I know what it is doing and I would put in a change log for change management.
+docker pull mercari/certificate-expiry-monitor-controller
