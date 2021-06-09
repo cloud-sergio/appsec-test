@@ -12,3 +12,4 @@ The organization allows applications with high severity vulnerabilities to be re
 Resolve the vulnerabilities through implementing changes to the files and once the image has no more vulnerabilies considered critical severity, the challenge is complete.
 
 Note: Removal of these dependencies is not considered a solution, while it would work it is not the objective of this challenge.
+
